@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ thống Theo dõi Độ ẩm Đất và Thời tiết</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .sensor-card {
+            transition: all 0.3s;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            padding: 20px;
+        }
+        .error-message {
+            color: red;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid red;
+            border-radius: 5px;
+            display: none;
+        }
+        .chart-container {
+            height: 400px;
+            margin-top: 20px;
+        }
+        .range-value {
+            display: inline-block;
+            min-width: 30px;
+        }
+        .weather-info {
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .weather-icon {
+            width: 50px;
+            height: 50px;
+        }
+        .weather-info-card {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .weather-info-card:hover {
+            background-color: #e9ecef;
+            transform: translateY(-2px);
+        }
+
+        .weather-icon {
+            font-size: 2rem;
+            margin-right: 15px;
+            color: #0d6efd;
+        }
+
+        #citySelector {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 5px 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        #citySelector:hover {
+            background-color: #e9ecef;
+            border-color: #adb5bd;
+        }
+
+        #citySelector:focus {
+            outline: none;
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+            border-color: #86b7fe;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container py-4">
+        <h1 class="text-center mb-4">Hệ thống Theo dõi Độ ẩm Đất và Thời tiết</h1>
+
+        <!-- Error message container -->
+        <div id="errorMessage" class="error-message"></div>
+
+        <!-- Weather Information -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="sensor-card">
+                    <h3>Thời tiết
+                        <select id="citySelector" class="form-select d-inline-block w-auto ms-2">
+                            <option value="thai_nguyen">Thái Nguyên</option>
+                            <!-- Options sẽ được thêm bằng JavaScript -->
+                        </select>
+                    </h3>
+                    <div class="row mt-3">
+                        <div class="col-md-3">
+                            <div class="weather-info-card">
+                                <i class="fas fa-temperature-high weather-icon"></i>
+                                <div>
+                                    <p class="mb-0">Nhiệt độ</p>
+                                    <h4 id="weatherTemp">--°C</h4>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="weather-info-card">
+                                <i class="fas fa-tint weather-icon"></i>
+                                <div>
+                                    <p class="mb-0">Độ ẩm</p>
+                                    <h4 id="weatherHumidity">--%</h4>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="weather-info-card">
+                                <i class="fas fa-wind weather-icon"></i>
+                                <div>
+                                    <p class="mb-0">Gió</p>
+                                    <h4 id="weatherWind">-- m/s</h4>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-muted">
+                                <p class="mb-0">Cập nhật lúc:</p>
+                                <p id="weatherTimestamp" class="small">--:--</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Độ ẩm đất -->
+            <div class="col-md-4">
+                <div class="sensor-card">
+                    <h3>Độ ẩm đất</h3>
+                    <div class="display-4" id="soilMoisture">--</div>
+                    <p class="text-muted">Đang cập nhật...</p>
+                </div>
+            </div>
+
+            <!-- Nhiệt độ -->
+            <div class="col-md-4">
+                <div class="sensor-card">
+                    <h3>Nhiệt độ</h3>
+                    <div class="display-4" id="temperature">--</div>
+                    <p class="text-muted">Đang cập nhật...</p>
+                </div>
+            </div>
+
+            <!-- Điều khiển -->
+            <div class="col-md-4">
+                <div class="sensor-card">
+                    <h3>Điều khiển</h3>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="autoControl" checked>
+                        <label class="form-check-label" for="autoControl">Tự động điều khiển</label>
+                    </div>
+                    <div class="mt-3">
+                        <label for="targetMoisture" class="form-label">Ngưỡng độ ẩm: <span id="targetValue" class="range-value">40</span>%</label>
+                        <input type="range" class="form-range" id="targetMoisture" min="0" max="100" value="40">
+                    </div>
+                    <div class="mt-3">
+                        <label for="targetTemperature" class="form-label">Nhiệt độ mong muốn: <span id="targetTempValue" class="range-value">25</span>°C</label>
+                        <input type="range" class="form-range" id="targetTemperature" min="15" max="35" value="25">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Biểu đồ -->
+        <div class="sensor-card mt-4">
+            <h3>Biểu đồ theo dõi</h3>
+            <div class="chart-container">
+                <canvas id="sensorChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Khởi tạo biến toàn cục
+        let chart;
+        let lastData = {
+            moisture: 0,
+            temperature: 0
+        };
+
+        // Khởi tạo biểu đồ
+        function initChart() {
+            const ctx = document.getElementById('sensorChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Độ ẩm đất (%)',
+                        borderColor: 'rgb(75, 192, 192)',
+                        data: [],
+                        fill: false
+                    }, {
+                        label: 'Nhiệt độ (°C)',
+                        borderColor: 'rgb(255, 99, 132)',
+                        data: [],
+                        fill: false
+                    }, {
+                        label: 'Độ ẩm mục tiêu (%)',
+                        borderColor: 'rgb(75, 192, 192)',
+                        borderDash: [5, 5],
+                        data: [],
+                        fill: false
+                    }, {
+                        label: 'Nhiệt độ mục tiêu (°C)',
+                        borderColor: 'rgb(255, 99, 132)',
+                        borderDash: [5, 5],
+                        data: [],
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            suggestedMax: 100
+                        }
+                    }
+                }
+            });
+        }
+
+        // Tải danh sách thành phố
+        function loadCities() {
+            fetch('/api/cities')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        const selector = document.getElementById('citySelector');
+                        selector.innerHTML = ''; // Xóa options cũ
+
+                        Object.entries(data.data).forEach(([key, name]) => {
+                            const option = document.createElement('option');
+                            option.value = key;
+                            option.textContent = name;
+                            selector.appendChild(option);
+                        });
+                    }
+                })
+                .catch(error => console.error('Error loading cities:', error));
+        }
+
+        // Cập nhật dữ liệu thời tiết
+        function updateWeatherData() {
+            const cityKey = document.getElementById('citySelector').value;
+            fetch(`/api/weather/${cityKey}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        document.getElementById('weatherTemp').textContent = `${data.data.temperature}°C`;
+                        document.getElementById('weatherHumidity').textContent = `${data.data.humidity}%`;
+                        document.getElementById('weatherWind').textContent = `${data.data.wind_speed} m/s`;
+                        document.getElementById('weatherTimestamp').textContent = data.data.timestamp;
+                    }
+                })
+                .catch(error => console.error('Error fetching weather data:', error));
+        }
+
+        // Cập nhật dữ liệu cảm biến
+        function updateSensorData() {
+            fetch('/get_sensor_data')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.status === 'success') {
+                        // Cập nhật giá trị hiện tại
+                        document.getElementById('soilMoisture').textContent = `${data.soil_moisture}%`;
+                        document.getElementById('temperature').textContent = `${data.temperature}°C`;
+
+                        // Cập nhật giá trị mục tiêu trên thanh trượt
+                        document.getElementById('targetMoisture').value = data.target_humidity;
+                        document.getElementById('targetValue').textContent = data.target_humidity;
+                        document.getElementById('targetTemperature').value = data.target_temperature;
+                        document.getElementById('targetTempValue').textContent = data.target_temperature;
+
+                        // Cập nhật biểu đồ
+                        const now = new Date().toLocaleTimeString();
+
+                        chart.data.labels.push(now);
+                        chart.data.datasets[0].data.push(data.soil_moisture);
+                        chart.data.datasets[1].data.push(data.temperature);
+                        chart.data.datasets[2].data.push(data.target_humidity);
+                        chart.data.datasets[3].data.push(data.target_temperature);
+
+                        if (chart.data.labels.length > 10) {
+                            chart.data.labels.shift();
+                            chart.data.datasets.forEach(dataset => dataset.data.shift());
+                        }
+
+                        chart.update();
+
+                        document.getElementById('errorMessage').style.display = 'none';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('errorMessage').textContent = 'Lỗi kết nối với máy chủ';
+                    document.getElementById('errorMessage').style.display = 'block';
+                });
+        }
+
+        // Hàm gửi cập nhật cài đặt lên server
+        function updateSensorSettings(humidity, temperature) {
+            const data = {};
+            if (humidity !== null) data.target_humidity = parseFloat(humidity);
+            if (temperature !== null) data.target_temperature = parseFloat(temperature);
+
+            fetch('/update_sensor', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('errorMessage').textContent = 'Lỗi khi cập nhật giá trị mục tiêu';
+                document.getElementById('errorMessage').style.display = 'block';
+            });
+        }
+
+        // Event Listeners
+        document.getElementById('targetMoisture').addEventListener('change', function(e) {
+        const value = e.target.value;
+        if (document.getElementById('autoControl').checked) {
+        updateSensorSettings(value, null);
+        }
+        });
+        document.getElementById('targetMoisture').addEventListener('input', function(e) {
+            const value = e.target.value;
+            document.getElementById('targetValue').textContent = value;
+        });
+
+        document.getElementById('targetTemperature').addEventListener('input', function(e) {
+            const value = e.target.value;
+            document.getElementById('targetTempValue').textContent = value;
+        });
+
+        document.getElementById('targetTemperature').addEventListener('change', function(e) {
+            const value = e.target.value;
+            if (document.getElementById('autoControl').checked) {
+                updateSensorSettings(null, value);
+            }
+        });
+
+        // Event listener cho city selector
+        document.getElementById('citySelector').addEventListener('change', updateWeatherData);
+
+        // Xử lý bật/tắt chế độ tự động
+        document.getElementById('autoControl').addEventListener('change', function(e) {
+            const isAuto = e.target.checked;
+            const moistureInput = document.getElementById('targetMoisture');
+            const temperatureInput = document.getElementById('targetTemperature');
+
+            if (isAuto) {
+                updateSensorSettings(
+                    parseFloat(moistureInput.value),
+                    parseFloat(temperatureInput.value)
+                );
+            }
+        });
+
+        // Khởi tạo khi trang được load
+        document.addEventListener('DOMContentLoaded', function() {
+            initChart();
+            loadCities(); // Load danh sách thành phố
+            updateSensorData();
+            updateWeatherData();
+            setInterval(updateSensorData, 2000); // Cập nhật dữ liệu cảm biến mỗi 2 giây
+            setInterval(updateWeatherData, 600000); // Cập nhật thời tiết mỗi 10 phút
+        });
+    </script>
+</body>
+</html>
